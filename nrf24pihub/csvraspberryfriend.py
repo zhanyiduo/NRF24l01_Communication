@@ -1,10 +1,12 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
-#
-# Example program to receive packets from the radio link
-#
+# raspberry pi nrf24l01 hub
+# more details at http://blog.riyas.org
+# Credits to python port of nrf24l01, Joao Paulo Barrac & maniacbugs original c library
+# ======================= changes on may 1,2015=======================
+#added csv write..and parses multiple data elements (Temp, press, humidity)
+#result goes to a file called temp.csv in the same place as this file
 
-from nrf24pihub.nrf24 import NRF24
+from nrf24 import NRF24
 import time
 from time import gmtime, strftime
 from datetime import datetime
@@ -26,7 +28,6 @@ radio.stopListening()
 
 radio.printDetails()
 radio.startListening()
-
 def hasNumbers(inputString):
     return any(char.isdigit() for char in inputString)
 def extract(raw_string, start_marker, end_marker):
@@ -40,8 +41,14 @@ while True:
     recv_buffer = []
     radio.read(recv_buffer)
     out = ''.join(chr(i) for i in recv_buffer)
-    import pdb; pdb.set_trace()
-    print out
+    temper=extract(out,'T','T')
+    humid=extract(out,'H','H')
+    press=extract(out,'P','P')
+    #import pdb; pdb.set_trace()
+    #print out
+    print temper
+    print humid
+    print press
     #write to csv if temper has a number
     if  hasNumbers(temper):
         print "writing csv"
@@ -49,3 +56,4 @@ while True:
         filep = open("temp.csv", "a")
         print >> filep, ";".join([date,temper, humid, press])
         filep.close()
+    
