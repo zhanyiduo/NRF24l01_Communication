@@ -27,12 +27,6 @@ radio.stopListening()
 radio.printDetails()
 radio.startListening()
 
-def hasNumbers(inputString):
-    return any(char.isdigit() for char in inputString)
-def extract(raw_string, start_marker, end_marker):
-    start = raw_string.index(start_marker) + len(start_marker)
-    end = raw_string.index(end_marker, start)
-    return raw_string[start:end]
 while True:
     pipe = [0]
     while not radio.available(pipe, True):
@@ -41,11 +35,4 @@ while True:
     radio.read(recv_buffer)
     out = ''.join(chr(i) for i in recv_buffer)
     import pdb; pdb.set_trace()
-    print out
-    #write to csv if temper has a number
-    if  hasNumbers(temper):
-        print "writing csv"
-        date = str(datetime.now())
-        filep = open("temp.csv", "a")
-        print >> filep, ";".join([date,temper, humid, press])
-        filep.close()
+    print(out)
