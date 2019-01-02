@@ -30,8 +30,8 @@ while(1):
         time.sleep(100 / 100)
     receivedMessage = []
     radio.read(receivedMessage, radio.getDynamicPayloadSize())
-	pdb.set_trace()
-	print("Received: {}".format(receivedMessage))
+    pdb.set_trace()
+    print("Received: {}".format(receivedMessage))
 
     print("Translating the receivedMessage into unicode characters")
     string = ""
@@ -40,4 +40,4 @@ while(1):
         if (n >= 32 and n <= 126):
             string += chr(n)
     print("Out received message decodes to: {}".format(string))
-	time.sleep(2)
+    time.sleep(2)
