@@ -31,7 +31,7 @@ while(1):
     receivedMessage = []
     radio.read(receivedMessage, radio.getDynamicPayloadSize())
 	pdb.set_trace()
-    print("Received: {}".format(receivedMessage))
+	print("Received: {}".format(receivedMessage))
 
     print("Translating the receivedMessage into unicode characters")
     string = ""
