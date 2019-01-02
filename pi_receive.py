@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 from lib_nrf24 import NRF24
 import time
 import spidev
+import pdb
 
 GPIO.setmode(GPIO.BCM)
 
@@ -29,7 +30,6 @@ while(1):
         time.sleep(100 / 100)
     receivedMessage = []
     radio.read(receivedMessage, radio.getDynamicPayloadSize())
-	import pdb
 	pdb.set_trace()
     print("Received: {}".format(receivedMessage))
 
