@@ -1,32 +1,38 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# Python port of Maniacbug NRF24L01 library
-# Author: Joao Paulo Barraca <jpbarraca@gmail.com>
-#
-# BeagleBoneBlack and Raspberry Pi use different GPIO access methods.
-# Select the most appropriate for you by uncommenting one of the
-# two imports.
-# For Raspberry Pi
-import RPi.GPIO as GPIO
 
-#For BBBB
-#import Adafruit_BBIO.GPIO as GPIO
 
-import spidev
-import time
+# This file lib_nrf24.py is a slightly tweaked version of Barraca's "pynrf24".
+
+# So this is my tweak for Raspberry Pi and "Virtual GPIO" ...
+#       ... of Barraca's port to BeagleBone python ...  (Joao Paulo Barraca <jpbarraca@gmail.com>)
+#                ... of maniacbug's NRF24L01 C++ library for Arduino.
+# Brian Lavery Oct 2014
+
+
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+
+
 import sys
+import time
 
+if __name__ == '__main__':
+    print (sys.argv[0], 'is an importable module:')
+    print ("...  from", sys.argv[0], "import lib_nrf24")
+    print ("")
+
+    exit()
 
 def _BV(x):
     return 1 << x
@@ -171,39 +177,38 @@ class NRF24:
     child_payload_size = [RX_PW_P0, RX_PW_P1, RX_PW_P2, RX_PW_P3, RX_PW_P4, RX_PW_P5]
     child_pipe_enable = [ERX_P0, ERX_P1, ERX_P2, ERX_P3, ERX_P4, ERX_P5]
 
-    def __init__(self):
-        GPIO.setmode(GPIO.BCM)
-        self.ce_pin = "25"
-        self.irq_pin = "P9_16"
+    GPIO = None
+    spidev = None
+
+    def __init__(self, gpio, spidev):
+        # It should be possible to instantiate multiple objects, with different GPIO / spidev
+        # EG on Raspberry, one could be RPI GPIO & spidev module, other could be virtual-GPIO
+        # On rpi, only bus 0 is supported here, not bus 1 of the model B plus
+        self.GPIO = gpio   # the GPIO module
+        self.spidev = spidev # the spidev object/instance
         self.channel = 76
         self.data_rate = NRF24.BR_1MBPS
         self.wide_band = False # 2Mbs data rate in use?
-        self.p_variant = False # False for RF24L01 and true for RF24L01P
+        self.p_variant = False # False for RF24L01 and true for RF24L01P (nrf24l01+)
         self.payload_size = 5 #*< Fixed size of payloads
         self.ack_payload_available = False #*< Whether there is an ack payload waiting
         self.dynamic_payloads_enabled = False #*< Whether dynamic payloads are enabled.
         self.ack_payload_length = 5 #*< Dynamic size of pending ack payload.
         self.pipe0_reading_address = None #*< Last address set on pipe 0 for reading.
-        self.spidev = None
 
     def ce(self, level):
+        if self.ce_pin == 0:
+            return
+        # rf24-CE is optional. Tie to HIGH if not used. (Altho, left floating seems to read HIGH anyway??? - risky!)
+        # Some RF24 modes may NEED control over CE.
+        # non-powerdown, fixed PTX or RTX role, dynamic payload size & ack-payload:    does NOT need CE.
         if level == NRF24.HIGH:
-            GPIO.output(self.ce_pin, GPIO.HIGH)
+            self.GPIO.output(self.ce_pin, self.GPIO.HIGH)
         else:
-            GPIO.output(self.ce_pin, GPIO.LOW)
+            self.GPIO.output(self.ce_pin, self.GPIO.LOW)
         return
 
-    def irqWait(self, timeout = 30000):
-        # CHANGE: detect module name because wait_for_edge is not available in
-        # other libraries
-        if GPIO.__name__ != "Adafruit_BBIO.GPIO":
-            return False
 
-        # TODO: A race condition may occur here.
-        if GPIO.input(self.irq_pin) == 0: # Pin is already down. Packet is waiting?
-            return True
-
-        return GPIO.wait_for_edge(self.irq_pin, GPIO.FALLING, timeout) == 1
 
     def read_register(self, reg, blen=1):
         buf = [NRF24.R_REGISTER | ( NRF24.REGISTER_MASK & reg )]
@@ -218,7 +223,8 @@ class NRF24:
 
     def write_register(self, reg, value, length=-1):
         buf = [NRF24.W_REGISTER | ( NRF24.REGISTER_MASK & reg )]
-        if isinstance(value, (int, long)):
+        ###if isinstance(value, (int, long)):   # ng for python3. but value should never be long anyway
+        if isinstance(value, int):
             if length < 0:
                 length = 1
 
@@ -292,32 +298,28 @@ class NRF24:
             1 if status & _BV(NRF24.RX_DR) else 0,
             1 if status & _BV(NRF24.TX_DS) else 0,
             1 if status & _BV(NRF24.MAX_RT) else 0,
-            ((status >> NRF24.RX_P_NO) & int("111", 2)),
+            ((status >> NRF24.RX_P_NO) & 7),
             1 if status & _BV(NRF24.TX_FULL) else 0)
 
-        print(status_str)
+        print (status_str)
 
     def print_observe_tx(self, value):
-        tx_str = "OBSERVE_TX=0x{0:02x}: POLS_CNT={2:x} ARC_CNT={2:x}\r\n".format(
-            value,
-            (value >> NRF24.PLOS_CNT) & int("1111",2),
-            (value >> NRF24.ARC_CNT)  & int("1111",2)
-            )
-        print tx_str
+        print ("Observe Tx: %02x   Lost Pkts: %d    Retries: %d" % (value, value >> NRF24.PLOS_CNT, value & 15))
+
 
     def print_byte_register(self, name, reg, qty=1):
         extra_tab = '\t' if len(name) < 8 else 0
-        print "%s\t%c =" % (name, extra_tab),
+        print ("%s\t%c =" % (name, extra_tab)),
         while qty > 0:
-            print "0x%02x" % (self.read_register(reg)),
+            print ("0x%02x" % (self.read_register(reg))),
             qty -= 1
             reg += 1
 
-        print ""
+        print ("")
 
     def print_address_register(self, name, reg, qty=1):
         extra_tab = '\t' if len(name) < 8 else 0
-        print "%s\t%c =" % (name, extra_tab),
+        print ("%s\t%c =" % (name, extra_tab)),
 
         while qty > 0:
             qty -= 1
@@ -327,7 +329,7 @@ class NRF24:
             for i in buf:
                 sys.stdout.write("%02x" % i)
 
-        print ""
+        print ("")
 
 
     def setChannel(self, channel):
@@ -358,27 +360,28 @@ class NRF24:
         self.print_byte_register("DYNPD/FEATURE", NRF24.DYNPD, 2)
 
         #
-        print "Data Rate\t = %s" % NRF24.datarate_e_str_P[self.getDataRate()]
-        print "Model\t\t = %s" % NRF24.model_e_str_P[self.isPVariant()]
-        print "CRC Length\t = %s" % NRF24.crclength_e_str_P[self.getCRCLength()]
-        print "PA Power\t = %s" % NRF24.pa_dbm_e_str_P[self.getPALevel()]
+        print ("Data Rate\t = %s" % NRF24.datarate_e_str_P[self.getDataRate()])
+        print ("Model\t\t = %s" % NRF24.model_e_str_P[self.isPVariant()])
+        print ("CRC Length\t = %s" % NRF24.crclength_e_str_P[self.getCRCLength()])
+        print ("PA Power\t = %s" % NRF24.pa_dbm_e_str_P[self.getPALevel()])
 
-    def begin(self, major, minor, ce_pin, irq_pin):
-        # Initialize SPI bus
-        self.spidev = spidev.SpiDev()
-        self.spidev.open(major, minor)
+    def begin(self, csn_pin, ce_pin=0):   # csn & ce are RF24 terminology. csn = SPI's CE!
+        # Initialize SPI bus..
+        # ce_pin is for the rx=listen or tx=trigger pin on RF24 (they call that ce !!!)
+        # CE optional (at least in some circumstances, eg fixed PTX PRX roles, no powerdown)
+        # CE seems to hold itself as (sufficiently) HIGH, but tie HIGH is safer!
+        self.spidev.open(0, csn_pin)
         self.ce_pin = ce_pin
-        self.irq_pin = irq_pin
 
-        GPIO.setup(self.ce_pin, GPIO.OUT)
-        GPIO.setup(self.irq_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        if ce_pin:
+            self.GPIO.setup(self.ce_pin, self.GPIO.OUT)
 
         time.sleep(5 / 1000000.0)
 
         # Set 1500uS (minimum for 32B payload in ESB@250KBPS) timeouts, to make testing a little easier
         # WARNING: If this is ever lowered, either 250KBS mode with AA is broken or maximum packet
         # sizes must never be used. See documentation for a more complete explanation.
-        self.write_register(NRF24.SETUP_RETR, (int('0100', 2) << NRF24.ARD) | (int('1111', 2) << NRF24.ARC))
+        self.write_register(NRF24.SETUP_RETR, (0b0100 << NRF24.ARD) | 0b1111)
 
         # Restore our default PA level
         self.setPALevel(NRF24.PA_MAX)
@@ -457,14 +460,20 @@ class NRF24:
             if (status & (_BV(NRF24.TX_DS) | _BV(NRF24.MAX_RT))) or (time.time() - sent_at > timeout ):
                 break
             time.sleep(10 / 1000000.0)
+        #obs = self.read_register(NRF24.OBSERVE_TX)
+        #self.print_observe_tx(obs)
+        #self.print_status(status)
+        # (for debugging)
 
         what = self.whatHappened()
 
         result = what['tx_ok']
-
+        if what['tx_fail']:
+            self.flush_tx();    # bl  - dont jam up the fifo
         # Handle the ack packet
         if what['rx_ready']:
             self.ack_payload_length = self.getDynamicPayloadSize()
+            self.ack_payload_available = True              ## bl
 
         return result
 
@@ -476,14 +485,21 @@ class NRF24:
         self.write_payload(buf)
 
         # Allons!
-        self.ce(NRF24.HIGH)
-        time.sleep(10 / 1000000.0)
-        self.ce(NRF24.LOW)
+        if self.ce_pin:
+            if self.GPIO.RPI_REVISION > 0:
+                self.ce(self.GPIO.HIGH)
+                time.sleep(10 / 1000000.0)
+                self.ce(self.GPIO.LOW)
+            else:
+                # virtGPIO is slower. A 10 uSec pulse is better done with pulseOut():
+                self.GPIO.pulseOut(self.ce_pin, self.GPIO.HIGH, 10)
+
+
 
     def getDynamicPayloadSize(self):
         return self.spidev.xfer2([NRF24.R_RX_PL_WID, NRF24.NOP])[1]
 
-    def available(self, pipe_num=None, irq_wait=False, irq_timeout=30000):
+    def available(self, pipe_num=None):
         if not pipe_num:
             pipe_num = []
 
@@ -494,12 +510,6 @@ class NRF24:
         # doesn't set the RX flag...
         if status & _BV(NRF24.RX_DR) or (status & 0b00001110 != 0b00001110):
             result = True
-        else:
-            if irq_wait: # Will use IRQ wait
-                if self.irqWait(irq_timeout): # Do we have a packet?
-                    status = self.get_status() # Seems like we do!
-                    if status & _BV(NRF24.RX_DR) or (status & 0b00001110 != 0b00001110):
-                        result = True 
 
         if result:
             # If the caller wants the pipe number, include that
@@ -632,7 +642,7 @@ class NRF24:
 
     def setAutoAck(self, enable):
         if enable:
-            self.write_register(NRF24.EN_AA, int('111111',2))
+            self.write_register(NRF24.EN_AA, 0b111111)
         else:
             self.write_register(NRF24.EN_AA, 0)
 
@@ -762,12 +772,16 @@ class NRF24:
         self.write_register(NRF24.CONFIG, disable)
 
     def setRetries(self, delay, count):
-        self.write_register(NRF24.SETUP_RETR, (delay & 0xf) << NRF24.ARD | (count & 0xf) << NRF24.ARC)
-
+        # see specs. Delay code below 5 can conflict with some ACK lengths
+        # and count should be set = 0 for non-ACK modes
+        self.write_register(NRF24.SETUP_RETR, (delay & 0xf) << NRF24.ARD | (count & 0xf))
 
     def getRetries(self):
         return self.read_register(NRF24.SETUP_RETR)
 
-    def getMaxTimeout(self):
+    def getMaxTimeout(self):        # seconds
         retries = self.getRetries()
-        return ((250+(250*((retries& 0xf0)>>4 ))) * (retries & 0x0f)) / 1000000.0
+        tout = (((250+(250*((retries& 0xf0)>>4 ))) * (retries & 0x0f)) / 1000000.0 * 2) + 0.008
+        # Fudged up to about double Barraca's calculation
+        # Was too short & was timeing out wrongly.    BL
+        return tout
