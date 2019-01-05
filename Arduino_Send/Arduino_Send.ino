@@ -14,11 +14,15 @@ void setup(void){
   radio.enableDynamicPayloads();
   radio.powerUp();
 
+  Serial.begin(9600);
+
 }
 
 void loop(void){
     const char text[] = "Hello World is awesome";
   radio.write(&text, sizeof(text));
+  if (Serial.available() > 0) {
+    Serial.print(text);
+  }
   delay(1000);
-
 }
