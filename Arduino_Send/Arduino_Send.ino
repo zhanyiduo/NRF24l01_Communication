@@ -20,9 +20,9 @@ void setup(void){
 
 void loop(void){
     const char text[] = "Hello World is awesome";
-  radio.write(&text, sizeof(text));
-  if (Serial.available() > 0) {
-    Serial.print(text);
+    float data[] = {2.5,1.0};
+  if (radio.write(&data, sizeof(data))) {
+    Serial.print("data send success!");
   }
-  delay(1000);
+  delay(10000);
 }
