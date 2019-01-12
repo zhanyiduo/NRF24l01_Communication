@@ -36,15 +36,7 @@ void loop(void){
     imu_data.gyro_x = 4.0;
     imu_data.gyro_y = 5.0;
     imu_data.gyro_z = 6.0;
-
-    const char text[] = "Hello World is awesome";
-    bool txt_stat = radio.write(&text, sizeof(text));
-    if (radio.write(&text, sizeof(text))) {
-        Serial.print("text send success!\n");
-     }
-     else{
-        Serial.print("text send fail!\n");
-      }
+    
     bool stat = radio.write(&imu_data, sizeof(imu_data));
     if (radio.write(&imu_data, sizeof(imu_data))) {
         Serial.print("data send success!\n");
