@@ -7,19 +7,18 @@
 RF24 radio(9, 10);
 
 typedef struct{
-  float accel_x;
-  float accel_y;
-  float accel_z;
-  float gyro_x;
-  float gyro_y;
-  float gyro_z;
+  int accel_x;
+  int accel_y;
+  int accel_z;
 } A_t;
 A_t imu_data;
+
+float accel_x,accel_y,accel_z;
 
 void setup(void){
   radio.begin();
   radio.setPALevel(RF24_PA_MAX);
-  radio.setDataRate(RF24_250KBPS);
+  //radio.setDataRate(RF24_250KBPS);
   radio.setChannel(0x76);
   radio.openWritingPipe(0xF0F0F0F0E1LL);
   radio.enableDynamicPayloads();
@@ -30,19 +29,20 @@ void setup(void){
 }
 
 void loop(void){
-    imu_data.accel_x = 1.0;
-    imu_data.accel_y = 2.0;
-    imu_data.accel_z = 3.0;
-    imu_data.gyro_x = 4.0;
-    imu_data.gyro_y = 5.0;
-    imu_data.gyro_z = 6.0;
+    accel_x = 5.05;
+    accel_y = 22.01;
+    accel_z = 10.07;
     
-    bool stat = radio.write(&imu_data, sizeof(imu_data));
-    if (radio.write(&imu_data, sizeof(imu_data))) {
-        Serial.print("data send success!\n");
-     }
-     else{
-        Serial.print("data send fail!\n");
-      }
+    imu_data.accel_x = (int)(100*accel_x);
+    imu_data.accel_y = (int)(100*accel_y);
+    imu_data.accel_z = (int)(100*accel_z);
+
+    Serial.println("imu_data of x, y, z");
+    Serial.println(imu_data.accel_x);
+    Serial.println(imu_data.accel_y);
+    Serial.println(imu_data.accel_z);
+    bool stat = radio.write(&imu_data, sizeof(A_t));
+
+
   delay(5000);
 }

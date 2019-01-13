@@ -24,6 +24,9 @@ radio.openReadingPipe(1, pipes[1])
 radio.printDetails()
 radio.startListening()
 
+imu_data = []
+dataread_interval = 5
+
 while(1):
     # ackPL = [1]
     while not radio.available(0):
@@ -32,7 +35,12 @@ while(1):
     radio.read(receivedMessage, radio.getDynamicPayloadSize())
     print("Received: {}".format(receivedMessage))
 
-    print("Translating the receivedMessage into unicode characters")
-    string = ""
-    for n in receivedMessage:
-        print(n)
+    #adding data to the dictionary
+    if(time.time()-curent_time>=dataread_interval):
+        curent_time = time.time()
+        accel_x = (float(receivedMessage[1])*256+float(receivedMessage[0]))/100
+        accel_y = (float(receivedMessage[3]) * 256 + float(receivedMessage[2])) / 100
+        accel_z = (float(receivedMessage[5]) * 256 + float(receivedMessage[4])) / 100
+        imu_data.append([curent_time, accel_x, accel_y, accel_z])
+        print("data saved in imu_data:")
+        print([curent_time, accel_x, accel_y, accel_z])
