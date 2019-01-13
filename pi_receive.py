@@ -24,8 +24,10 @@ radio.openReadingPipe(1, pipes[1])
 radio.printDetails()
 radio.startListening()
 
+'''Initialization'''
 imu_data = []
 dataread_interval = 5
+curent_time = time.time()
 
 while(1):
     # ackPL = [1]
